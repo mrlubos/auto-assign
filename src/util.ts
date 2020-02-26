@@ -5,7 +5,10 @@ export function chooseUsers(
   candidates: string[],
   desiredNumber: number,
   filterUser: string = ''
-): string[] {
+): {
+  users: string[]
+  teams: string[]
+} {
   const filteredCandidates = candidates.filter(
     (reviewer: string): boolean => {
       return reviewer !== filterUser
@@ -14,10 +17,16 @@ export function chooseUsers(
 
   // all-assign
   if (desiredNumber === 0) {
-    return filteredCandidates
+    return {
+      users: filteredCandidates,
+      teams: []
+    }
   }
 
-  return _.sampleSize(filteredCandidates, desiredNumber)
+  return {
+    users: _.sampleSize(filteredCandidates, desiredNumber),
+    teams: []
+  }
 }
 
 export function chooseUsersFromGroups(
@@ -27,28 +36,43 @@ export function chooseUsersFromGroups(
 ): string[] {
   let users: string[] = []
   for (const group in groups) {
-    users = users.concat(chooseUsers(groups[group], desiredNumber, owner))
+    users = users.concat(chooseUsers(groups[group], desiredNumber, owner).users)
   }
   return users
 }
 
-export function chooseReviewers(owner: string, config: Config): string[] {
+export function chooseReviewers(
+  owner: string,
+  config: Config
+): {
+  reviewers: string[]
+  team_reviewers: string[]
+} {
   const { useReviewGroups, reviewGroups, numberOfReviewers, reviewers } = config
-  let chosenReviewers: string[] = []
   const useGroups: boolean =
     useReviewGroups && Object.keys(reviewGroups).length > 0
 
   if (useGroups) {
-    chosenReviewers = chooseUsersFromGroups(
+    const chosenReviewers = chooseUsersFromGroups(
       owner,
       reviewGroups,
       numberOfReviewers
     )
-  } else {
-    chosenReviewers = chooseUsers(reviewers, numberOfReviewers, owner)
+
+    return {
+      reviewers: chosenReviewers,
+      // eslint-disable-next-line @typescript-eslint/camelcase
+      team_reviewers: []
+    }
   }
 
-  return chosenReviewers
+  const chosenReviewers = chooseUsers(reviewers, numberOfReviewers, owner)
+
+  return {
+    reviewers: chosenReviewers.users,
+    // eslint-disable-next-line @typescript-eslint/camelcase
+    team_reviewers: chosenReviewers.teams
+  }
 }
 
 export function chooseAssignees(owner: string, config: Config): string[] {
@@ -85,7 +109,7 @@ export function chooseAssignees(owner: string, config: Config): string[] {
       candidates,
       numberOfAssignees || numberOfReviewers,
       owner
-    )
+    ).users
   }
 
   return chosenAssignees
